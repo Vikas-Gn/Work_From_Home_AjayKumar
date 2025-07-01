@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: postgres-wfh
+    ports:
+      - "5041:5432"
+    environment:
+      POSTGRES_DB: new_employee_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+
+  backend:
+    build: ./Backend
+    container_name: Backend-wfh
+    ports:
+      - "3074:3074"
+    environment:
+      - DB_USER=postgres
+      - DB_HOST=postgres
+      - DB_NAME=new_employee_db
+      - DB_PASSWORD=admin123
+      - DB_PORT=5432
+      - PORT=3074
+      - FRONTEND_URL=http://13.233.138.24:9016
+    depends_on:
+      - postgres
+    restart: always
+
+  frontend:
+    build: ./Frontend
+    container_name: Frontend-wfh
+    ports:
+      - "9016:80"
+    restart: always
+
+  hr_page:
+    build: ./HR_page
+    container_name: HR_page_wfh
+    ports:
+      - "9017:80"
+    restart: always
+
+volumes:
+  postgres_data:
+
