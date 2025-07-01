@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 3052;
+const port = process.env.PORT || 3074;
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -19,14 +19,14 @@ const pool = new Pool({
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL,
-    "http://localhost:3001",
+    "http://13.233.138.24:3074",
     "http://127.0.0.1:5500",
     "http://localhost:5500",
     "http://127.0.0.1:5501",
     "http://127.0.0.1:5503", // Added to allow requests from this origin
     "http://localhost:5503", // Added to allow requests from this origin
-    "http://localhost:8081",
-    "http://localhost:8089"
+    "http://13.233.138.24:9016",
+    "http://13.233.138.24:9017"
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -202,5 +202,5 @@ app.get('/hr', (req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running on http://65.2.149.3:${port}`);
+  console.log(`Server running on http://13.233.138.24:${port}`);
 });
