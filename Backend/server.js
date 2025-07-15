@@ -202,5 +202,5 @@ app.get('/hr', (req, res) => {
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running on http://65.0.74.172${port}`);
+  console.log(`Server running on http://65.0.74.172:${port}`);
 });
