@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,8 +49,8 @@
 
         header {
             width: 100%;
-            max-width: 1400px;
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            max-width: 1200px;
+             background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
             color: var(--lighter);
             padding: 2rem;
             border-radius: var(--border-radius-lg);
@@ -120,7 +121,7 @@
 
         .filter-container {
             width: 100%;
-            max-width: 1400px;
+            max-width: 1200px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -173,7 +174,7 @@
 
         .form-container {
             width: 100%;
-            max-width: 1400px;
+            max-width: 1200px;
             background: var(--glass-bg);
             backdrop-filter: var(--glass-blur);
             border-radius: var(--border-radius-lg);
@@ -300,7 +301,7 @@
 
         .main-container {
             width: 100%;
-            max-width: 1400px;
+            max-width: 1200px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 1.5rem;
@@ -488,6 +489,7 @@
 
         .calendar .days {
             display: grid;
+            
             grid-template-columns: repeat(7, 1fr);
             gap: 0.5rem;
         }
@@ -511,15 +513,18 @@
         }
 
         .calendar .day.wfh {
+           
             color: var(--success);
         }
 
         .calendar .day.holiday {
-            color: var(--warning);
+          
+            color:var(--warning);
         }
 
         .calendar .day.today {
-            color: var(--accent);
+            
+            color:var(--accent);
             font-weight: 600;
         }
 
@@ -882,7 +887,7 @@
                 <div class="form-col">
                     <div class="form-group">
                         <label for="employeeEmail">📧 Email</label>
-                        <input type="email" id="employeeEmail" placeholder="your.name@astrolitetech.com" required minlength="3" maxlength="100" onkeypress="return (event.charCode != 32)">
+                        <input type="email" id="employeeEmail" placeholder="your.email@gmail.com" required minlength="3" maxlength="100" onkeypress="return (event.charCode != 32)">
                         <p class="error-message" id="employeeEmailError"></p>
                     </div>
                 </div>
@@ -1003,878 +1008,834 @@
             <button class="confirmation-button" id="confirmationButton">OK</button>
         </div>
     </div>
-<script>
-  const BASE_URL = 'http://65.2.191.52:3074';
-const ANNUAL_WFH_LIMIT = 60;
-let validationTimeout;
 
-// Define holidays
-const holidays = {
-    1: { 1: "New Year's Day", 14: "Makar Sankranti", 26: "Republic Day" },
-    2: { 14: "Maha Shivaratri" },
-    3: { 2: "Holi" },
-    4: { 14: "Ram Navami", 18: "Good Friday" },
-    8: { 15: "Independence Day", 5: "Krishna Janmashtami", 15: "Ganesh Chaturthi" },
-    10: { 2: "Gandhi Jayanti", 20: "Dussehra", 9: "Diwali" },
-    12: { 25: "Christmas" }
-};
-
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('wfhForm');
-    const formContainer = document.getElementById('wfhFormContainer');
-    const requestsList = document.getElementById('requestsList');
-    const wfhSummary = document.getElementById('wfhSummary');
-    const confirmationAnimation = document.getElementById('confirmationAnimation');
-    const confirmationMessage = document.getElementById('confirmationMessage');
-    const confirmationButton = document.getElementById('confirmationButton');
-    const calendarDays = document.getElementById('calendarDays');
-    const currentMonthYear = document.getElementById('currentMonthYear');
-    const prevMonthBtn = document.getElementById('prevMonth');
-    const nextMonthBtn = document.getElementById('nextMonth');
-    const applyWFH = document.getElementById('applyWFH');
-    const detailModal = document.getElementById('detailModal');
-    const monthFilter = document.getElementById('monthFilter');
-    const yearFilter = document.getElementById('yearFilter');
-
-    let allSubmissions = [];
-    let currentDate = new Date();
-    let currentMonth = currentDate.getMonth();
-    let currentYear = currentDate.getFullYear();
-
-    init();
-
-    function init() {
-        setupEventListeners();
-        const empId = document.getElementById('employeeID').value.trim();
-        if (empId && /^ATS0(?!000)[0-9]{3}$/.test(empId)) {
-            fetchSubmissions(empId);
-        } else {
-            showNoDataMessage();
-        }
-        setDateConstraints();
-    }
-
-    function showNoDataMessage() {
-        requestsList.innerHTML = `
-            <div class="no-data">
-                <span>📭</span>
-                <p>Please enter a valid Employee ID to view requests</p>
-            </div>`;
-        wfhSummary.innerHTML = `
-            <div class="no-data">
-                <span>📊</span>
-                <p>Enter Employee ID to view summary</p>
-            </div>`;
-        generateCalendar();
-    }
-
-    function setDateConstraints() {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const oneYearFromToday = new Date(today);
-        oneYearFromToday.setFullYear(today.getFullYear() + 1);
-        const fromDateInput = document.getElementById('fromDate');
-        const toDateInput = document.getElementById('toDate');
-        fromDateInput.min = formatDate(today);
-        fromDateInput.max = formatDate(oneYearFromToday);
-        toDateInput.min = formatDate(today);
-        toDateInput.max = formatDate(oneYearFromToday);
-    }
-
-    function setupEventListeners() {
-        applyWFH.addEventListener('click', toggleForm);
-        form.addEventListener('submit', handleFormSubmit);
-        monthFilter.addEventListener('change', filterRequests);
-        yearFilter.addEventListener('change', filterRequests);
-
-        const inputs = [
-            { id: 'employeeName', validator: validateEmployeeName },
-            { id: 'employeeID', validator: validateEmployeeID },
-            { id: 'employeeEmail', validator: validateEmail },
-            { id: 'workingProject', validator: validateWorkingProject },
-            { id: 'reportingManager', validator: validateReportingManager },
-            { id: 'wfhLocation', validator: validateLocation },
-            { id: 'reason', validator: validateReason }
-        ];
-
-        inputs.forEach(({ id, validator }) => {
-            const input = document.getElementById(id);
-            input.addEventListener('input', () => {
-                clearTimeout(validationTimeout);
-                validationTimeout = setTimeout(() => {
-                    validator();
-                    if (id === 'employeeID' && validateEmployeeID()) {
-                        fetchSubmissions(input.value.trim());
-                    }
-                }, 500);
-            });
-        });
-
-        const emailInput = document.getElementById('employeeEmail');
-        emailInput.addEventListener('keydown', function(e) {
-            if (e.key === ' ' || e.key === 'Spacebar' || /\s/.test(e.key)) {
-                e.preventDefault();
-            }
-        });
-
-        emailInput.addEventListener('paste', function(e) {
-            e.preventDefault();
-            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-            const sanitizedText = pastedText.replace(/\s+/g, '');
-            document.execCommand('insertText', false, sanitizedText);
-            validateEmail();
-        });
-
-        document.getElementById('fromDate').addEventListener('change', validateDates);
-        document.getElementById('toDate').addEventListener('change', validateDates);
-
-        confirmationButton.addEventListener('click', () => {
-            confirmationAnimation.classList.remove('show');
-        });
-
-        prevMonthBtn.addEventListener('click', () => {
-            currentMonth--;
-            if (currentMonth < 0) {
-                currentMonth = 11;
-                currentYear--;
-            }
-            generateCalendar();
-        });
-
-        nextMonthBtn.addEventListener('click', () => {
-            currentMonth++;
-            if (currentMonth > 11) {
-                currentMonth = 0;
-                currentYear++;
-            }
-            generateCalendar();
-        });
-
-        const cancelFormBtn = document.getElementById('cancelFormBtn');
-        if (cancelFormBtn) {
-            cancelFormBtn.addEventListener('click', closeForm);
-        }
-
-        const detailModalClose = document.getElementById('detailModalClose');
-        if (detailModalClose) {
-            detailModalClose.addEventListener('click', () => detailModal.classList.remove('show'));
-        }
-
-        const confirmModalClose = document.getElementById('confirmModalClose');
-        const cancelSubmitBtn = document.getElementById('cancelSubmitBtn');
-        const confirmSubmitBtn = document.getElementById('confirmSubmitBtn');
-
-        if (confirmModalClose) {
-            confirmModalClose.addEventListener('click', () => closeModal('confirmModal'));
-        }
-        if (cancelSubmitBtn) {
-            cancelSubmitBtn.addEventListener('click', cancelSubmit);
-        }
-        if (confirmSubmitBtn) {
-            confirmSubmitBtn.addEventListener('click', confirmSubmit);
-        }
-    }
-
-    function toggleForm() {
-        formContainer.classList.toggle('show');
-        applyWFH.querySelector('span')?.remove();
-        const isOpen = formContainer.classList.contains('show');
-        applyWFH.innerHTML = `🏠 ${isOpen ? 'Close WFH Form' : 'Apply WFH Request'}`;
-        if (!isOpen) {
-            form.reset();
-            clearErrors();
-        }
-    }
-
-    function closeForm() {
-        formContainer.classList.remove('show');
-        applyWFH.innerHTML = `🏠 Apply WFH Request`;
-        form.reset();
-        clearErrors();
-    }
-
-    function closeModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
-    }
-
-    function clearErrors() {
-        document.querySelectorAll('.error-message').forEach(error => {
-            error.textContent = '';
-            error.classList.remove('show');
-        });
-        form.querySelectorAll('input, textarea').forEach(input => {
-            input.setCustomValidity('');
-        });
-    }
-
-    function validateEmployeeName() {
-        const name = document.getElementById('employeeName').value;
-        const nameRegex = /^[A-Za-z]+(?:\.[A-Za-z]+)*(?: [A-Za-z]+)*(?:\.[A-Za-z]+){0,3}$/;
-        const consecutiveSpaces = /\s{2,}/;
-        const leadingTrailingSpaces = /^\s+|\s+$/;
-        const errorElement = document.getElementById('employeeNameError');
-
-        if (!name) {
-            errorElement.textContent = 'Name is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (leadingTrailingSpaces.test(name)) {
-            errorElement.textContent = 'No leading or trailing spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (consecutiveSpaces.test(name)) {
-            errorElement.textContent = 'No consecutive spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!nameRegex.test(name)) {
-            errorElement.textContent = 'Invalid name: Only letters, single spaces, and up to 3 dot-separated suffixes (e.g., John.M.Doe Smith.Jr)';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateEmployeeID() {
-        const empId = document.getElementById('employeeID').value.trim();
-        const empIdRegex = /^ATS0(?!000)[0-9]{3}$/;
-        const errorElement = document.getElementById('employeeIDError');
-
-        if (!empId) {
-            errorElement.textContent = 'Employee ID is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!empIdRegex.test(empId)) {
-            errorElement.textContent = 'Format: ATS0 followed by 3 digits (not all zeros)';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateEmail() {
-        const emailInput = document.getElementById('employeeEmail').value;
-        const hasSpaces = /\s/;
-        const emailRegex = /^[a-zA-Z][a-zA-Z0-9._-]*[a-zA-Z0-9]@astrolitetech\.com$/;
-        const errorElement = document.getElementById('employeeEmailError');
-
-        const sanitizedEmail = emailInput.replace(/\s+/g, '');
-        if (emailInput !== sanitizedEmail) {
-            document.getElementById('employeeEmail').value = sanitizedEmail;
-        }
-
-        if (!sanitizedEmail) {
-            errorElement.textContent = 'Email is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (hasSpaces.test(emailInput)) {
-            errorElement.textContent = 'No spaces allowed in email';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!emailRegex.test(sanitizedEmail)) {
-            errorElement.textContent = 'Email must be in format: firstname.lastname@astrolitetech.com';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateWorkingProject() {
-        const project = document.getElementById('workingProject').value;
-        const projectRegex = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
-        const consecutiveSpaces = /\s{2,}/;
-        const leadingTrailingSpaces = /^\s+|\s+$/;
-        const errorElement = document.getElementById('workingProjectError');
-
-        if (!project) {
-            errorElement.textContent = 'Project name is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (leadingTrailingSpaces.test(project)) {
-            errorElement.textContent = 'No leading or trailing spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (consecutiveSpaces.test(project)) {
-            errorElement.textContent = 'No consecutive spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (project.length < 3 || project.length > 40) {
-            errorElement.textContent = 'Project name must be 3-40 characters';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!projectRegex.test(project)) {
-            errorElement.textContent = 'Project name must contain only letters and single spaces';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateReportingManager() {
-        const manager = document.getElementById('reportingManager').value;
-        const nameRegex = /^[A-Za-z]+(?:\.[A-Za-z]+)*(?: [A-Za-z]+)*(?:\.[A-Za-z]+){0,3}$/;
-        const consecutiveSpaces = /\s{2,}/;
-        const leadingTrailingSpaces = /^\s+|\s+$/;
-        const errorElement = document.getElementById('reportingManagerError');
-
-        if (!manager) {
-            errorElement.textContent = 'Manager name is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (leadingTrailingSpaces.test(manager)) {
-            errorElement.textContent = 'No leading or trailing spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (consecutiveSpaces.test(manager)) {
-            errorElement.textContent = 'No consecutive spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!nameRegex.test(manager)) {
-            errorElement.textContent = 'Invalid name: Only letters, single spaces, and up to 3 dot-separated suffixes (e.g., John.M.Doe Smith.Jr)';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateLocation() {
-        const location = document.getElementById('wfhLocation').value;
-        const locationRegex = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
-        const consecutiveSpaces = /\s{2,}/;
-        const leadingTrailingSpaces = /^\s+|\s+$/;
-        const errorElement = document.getElementById('wfhLocationError');
-
-        if (!location) {
-            errorElement.textContent = 'Location is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (leadingTrailingSpaces.test(location)) {
-            errorElement.textContent = 'No leading or trailing spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (consecutiveSpaces.test(location)) {
-            errorElement.textContent = 'No consecutive spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (location.length < 3 || location.length > 100) {
-            errorElement.textContent = 'Location must be 3-100 characters';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!locationRegex.test(location)) {
-            errorElement.textContent = 'Location must contain only letters and single spaces';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateReason() {
-        const reason = document.getElementById('reason').value;
-        const reasonRegex = /^[A-Za-z][A-Za-z0-9\s,.]*[A-Za-z0-9]$/;
-        const consecutiveSpaces = /\s{2,}/;
-        const leadingTrailingSpaces = /^\s+|\s+$/;
-        const invalidConsecutive = /(,{2,}|\.{2,}|,\s,|\.\s\.|,\s\.|\.\s,)/;
-        const errorElement = document.getElementById('reasonError');
-
-        if (!reason) {
-            errorElement.textContent = 'Reason is required';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (leadingTrailingSpaces.test(reason)) {
-            errorElement.textContent = 'No leading or trailing spaces';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (consecutiveSpaces.test(reason)) {
-            errorElement.textContent = 'No consecutive spaces allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (reason.length < 10 || reason.length > 200) {
-            errorElement.textContent = 'Reason must be 10-200 characters';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (!reasonRegex.test(reason)) {
-            errorElement.textContent = 'Reason must start with a letter, end with a letter or number, and only letters, numbers, spaces, commas, periods';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        if (invalidConsecutive.test(reason)) {
-            errorElement.textContent = 'No consecutive commas, periods, or invalid punctuation patterns allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-
-        errorElement.classList.remove('show');
-        return true;
-    }
-
-    function validateDates() {
-        const fromDateInput = document.getElementById('fromDate');
-        const toDateInput = document.getElementById('toDate');
-        const fromDate = new Date(fromDateInput.value);
-        const toDate = new Date(toDateInput.value);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const oneYearFromToday = new Date(today);
-        oneYearFromToday.setFullYear(today.getFullYear() + 1);
-        const maxRangeMs = 60 * 24 * 60 * 60 * 1000;
-        const fromError = document.getElementById('fromDateError');
-        const toError = document.getElementById('toDateError');
-        const empId = document.getElementById('employeeID').value.trim();
-
-        if (!fromDateInput.value) {
-            fromError.textContent = 'From date is required';
-            fromError.classList.add('show');
-            fromDateInput.setCustomValidity('From date is required');
-            return false;
-        }
-
-        if (fromDate < today || fromDate > oneYearFromToday) {
-            fromError.textContent = 'From date must be today or within one year';
-            fromError.classList.add('show');
-            fromDateInput.setCustomValidity('Invalid date');
-            return false;
-        }
-
-        fromError.classList.remove('show');
-        fromDateInput.setCustomValidity('');
-
-        if (!toDateInput.value) {
-            toError.textContent = 'To date is required';
-            toError.classList.add('show');
-            toDateInput.setCustomValidity('To date is required');
-            return false;
-        }
-
-        if (toDate < fromDate) {
-            toError.textContent = 'To date must be on or after from date';
-            toError.classList.add('show');
-            toDateInput.setCustomValidity('Invalid date');
-            return false;
-        }
-
-        const rangeMs = toDate - fromDate;
-        if (rangeMs > maxRangeMs) {
-            toError.textContent = 'Date range cannot exceed 60 days';
-            toError.classList.add('show');
-            toDateInput.setCustomValidity('Invalid date');
-            return false;
-        }
-
-        // Check for date overlaps with existing submissions
-        if (empId && allSubmissions.length > 0) {
-            const newFrom = new Date(fromDateInput.value);
-            const newTo = new Date(toDateInput.value);
-            
-            for (const sub of allSubmissions) {
-                const subFrom = new Date(sub.from_date);
-                const subTo = new Date(sub.to_date);
-                
-                if ((newFrom >= subFrom && newFrom <= subTo) || 
-                    (newTo >= subFrom && newTo <= subTo) ||
-                    (newFrom <= subFrom && newTo >= subTo)) {
-                    
-                    fromError.textContent = 'Dates overlap with existing request';
-                    fromError.classList.add('show');
-                    toError.textContent = 'Dates overlap with existing request';
-                    toError.classList.add('show');
-                    return false;
-                }
-            }
-        }
-
-        toError.classList.remove('show');
-        toDateInput.setCustomValidity('');
-        return true;
-    }
-
-    async function handleFormSubmit(event) {
-        event.preventDefault();
-
-        const validations = [
-            validateEmployeeName(),
-            validateEmployeeID(),
-            validateEmail(),
-            validateWorkingProject(),
-            validateReportingManager(),
-            validateLocation(),
-            validateReason(),
-            validateDates()
-        ];
-
-        if (validations.every(valid => valid)) {
-            document.getElementById('confirmModal').style.display = 'flex';
-        } else {
-            alert('Please correct the form errors before submitting.');
-        }
-    }
-
-    async function confirmSubmit() {
-        closeModal('confirmModal');
-        const submitBtn = document.querySelector('#wfhForm button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting...';
-
-        const fromDate = new Date(document.getElementById('fromDate').value);
-        const toDate = new Date(document.getElementById('toDate').value);
-        const daysCount = Math.floor((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
-
-const request = {
-        name: document.getElementById('employeeName').value.trim(),
-        employeeId: document.getElementById('employeeID').value.trim(),
-        email: document.getElementById('employeeEmail').value.trim(),
-        project: document.getElementById('workingProject').value.trim(),
-        manager: document.getElementById('reportingManager').value.trim(),
-        location: document.getElementById('wfhLocation').value.trim(),
-        fromDate: document.getElementById('fromDate').value,
-        toDate: document.getElementById('toDate').value,
-        reason: document.getElementById('reason').value.trim(),
-        status: 'Pending'
-    };
-
-    console.log('Request payload:', request);
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            const response = await fetch(`${BASE_URL}/api/requests`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(request),
-                signal: controller.signal,
-                mode: 'cors'
-            });
-
-            clearTimeout(timeoutId);
-
-            let result;
-            try {
-                result = await response.json();
-            } catch (jsonError) {
-                console.error('Error parsing JSON response:', jsonError, 'Status:', response.status);
-                alert(`Server returned invalid response: ${response.status} ${response.statusText}`);
-                submitBtn.disabled = false;
-                submitBtn.textContent = '✈️ Submit Request';
-                return;
-            }
-
-            if (!response.ok) {
-                console.error('Server error response:', result, 'Status:', response.status);
-                alert(`Server error: ${result.error || 'Failed to submit request'}`);
-                submitBtn.disabled = false;
-                submitBtn.textContent = '✈️ Submit Request';
-                return;
-            }
-
-            form.reset();
-            closeForm();
-            showConfirmation(request.fromDate, request.toDate, daysCount);
-            await fetchSubmissions(request.employeeId);
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✈️ Submit Request';
-
-            setTimeout(() => {
-                if (confirmationAnimation.classList.contains('show')) {
-                    confirmationAnimation.classList.remove('show');
-                }
-            }, 5000);
-
-        } catch (error) {
-            console.error('Error submitting request:', error);
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✈️ Submit Request';
-            if (error.name === 'AbortError') {
-                alert('Error submitting request: Request timed out. Please try again.');
-            } else if (error.message.includes('Failed to fetch')) {
-                alert('Error submitting request: Unable to connect to server. Check network or server status.');
-            } else {
-                alert('Error submitting request: ' + error.message);
-            }
-        }
-    }
-
-    function cancelSubmit() {
-        closeModal('confirmModal');
-    }
-
-    function showConfirmation(fromDate, toDate, daysCount) {
-        const from = formatDate(fromDate);
-        const to = formatDate(toDate);
-        confirmationMessage.textContent = `Your work from home request for ${daysCount} day${daysCount > 1 ? 's' : ''} (${from} to ${to}) has been successfully submitted for approval.`;
-        confirmationAnimation.classList.add('show');
-        confirmationAnimation.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    async function fetchSubmissions(employeeId = '') {
-        if (!employeeId || !/^ATS0(?!000)[0-9]{3}$/.test(employeeId)) {
-            showNoDataMessage();
-            allSubmissions = [];
-            generateCalendar();
-            return;
-        }
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-            const url = new URL(`${BASE_URL}/api/requests`);
-            url.searchParams.append('employeeId', employeeId);
-            const response = await fetch(url, {
-                headers: { 'Accept': 'application/json' },
-                signal: controller.signal,
-                mode: 'cors'
-            });
-            clearTimeout(timeoutId);
-
-            let submissions;
-            try {
-                submissions = await response.json();
-            } catch (jsonError) {
-                console.error('Error parsing JSON response:', jsonError, 'Status:', response.status);
-                throw new Error(`Invalid server response: ${response.status} ${response.statusText}`);
-            }
-
-            if (!response.ok) {
-                throw new Error(`${submissions.error || 'Server error'}`);
-            }
-
-            allSubmissions = submissions;
-            filterRequests();
-            displaySummary();
-            generateCalendar();
-        } catch (error) {
-            console.error('Error fetching submissions:', error);
-            requestsList.innerHTML = `
-                <div class="no-data">
-                    <span>⚠️</span>
-                    <p>Error loading requests</p>
-                </div>`;
-            wfhSummary.innerHTML = `
-                <div class="no-data">
-                    <span>⚠️</span>
-                    <p>Error loading summary</p>
-                </div>`;
-            allSubmissions = [];
-            generateCalendar();
-        }
-    }
-
-    function filterRequests() {
-        const month = monthFilter.value;
-        const year = yearFilter.value;
-
-        const filteredSubmissions = allSubmissions.filter(sub => {
-            const fromDate = new Date(sub.from_date);
-            const matchesMonth = month === '' || fromDate.getMonth() === parseInt(month);
-            const matchesYear = year === '' || fromDate.getFullYear() === parseInt(year);
-            return matchesMonth && matchesYear;
-        });
-
-        displayRequests(filteredSubmissions);
-    }
-
-    function displayRequests(submissions) {
-        requestsList.innerHTML = '';
-        if (submissions.length === 0) {
-            requestsList.innerHTML = `
-                <div class="no-data">
-                    <span>📭</span>
-                    <p>No requests found</p>
-                </div>`;
-            return;
-        }
-
-        submissions.forEach(sub => {
-            const item = document.createElement('div');
-            item.className = 'request-item';
-            const fromDate = formatDate(sub.from_date);
-            const toDate = formatDate(sub.to_date);
-            item.innerHTML = `
-                <div class="request-header">
-                    <div class="request-type">🏠 Work From Home</div>
-                    <span class="request-status status-${sub.status.toLowerCase()}">${sub.status}</span>
-                </div>
-                <span class="request-dates">${fromDate} - ${toDate}</span>
-                <a href="#" class="view-link">View Details</a>
-            `;
-            item.querySelector('.view-link').addEventListener('click', (e) => {
-                e.preventDefault();
-                showRequestDetails(sub);
-            });
-            requestsList.appendChild(item);
-        });
-    }
-
-    function showRequestDetails(submission) {
-        const detailsContainer = document.getElementById('requestDetails');
-        const fromDate = formatDate(submission.from_date);
-        const toDate = formatDate(submission.to_date);
-        detailsContainer.innerHTML = `
-            <h2>Request Details</h2>
-            <p><span class="emoji">👤</span> <strong>Name:</strong> ${submission.name}</p>
-            <p><span class="emoji">🪪</span> <strong>Employee ID:</strong> ${submission.employee_id}</p>
-            <p><span class="emoji">📧</span> <strong>Email:</strong> ${submission.email}</p>
-            <p><span class="emoji">💡</span> <strong>Project:</strong> ${submission.project}</p>
-            <p><span class="emoji">👨‍💼</span> <strong>Manager:</strong> ${submission.manager}</p>
-            <p><span class="emoji">📍</span> <strong>Location:</strong> ${submission.location}</p>
-            <p><span class="emoji">📅</span> <strong>Dates:</strong> ${fromDate} - ${toDate}</p>
-            <p><span class="emoji">💬</span> <strong>Reason:</strong> ${submission.reason}</p>
-            <p><span class="emoji">🔍</span> <strong>Status:</strong> <span class="request-status status-${submission.status.toLowerCase()}">${submission.status}</span></p>
-        `;
-        detailModal.classList.add('show');
-    }
-
-    function displaySummary() {
-        const approvedDays = calculateApprovedDays();
-        const remainingDays = ANNUAL_WFH_LIMIT - approvedDays;
-        wfhSummary.innerHTML = `
-            <div class="summary-item">
-                <span class="emoji">✅</span>
-                <span>${approvedDays}/${ANNUAL_WFH_LIMIT} Approved WFH Days</span>
-            </div>
-            <div class="summary-item">
-                <span class="emoji">⏳</span>
-                <span>${remainingDays} Remaining WFH Days</span>
-            </div>
-        `;
-    }
-
-    function calculateApprovedDays() {
-        let totalDays = 0;
-        const approvedRequests = allSubmissions.filter(sub => sub.status === 'Approved');
-        approvedRequests.forEach(sub => {
-            const start = new Date(sub.from_date);
-            const end = new Date(sub.to_date);
-            const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
-            totalDays += days;
-        });
-        return totalDays;
-    }
-
-    function generateCalendar() {
-        const daysContainer = document.getElementById('calendarDays');
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-            'August', 'September', 'October', 'November', 'December'];
-        currentMonthYear.textContent = `${monthNames[currentMonth]} ${currentYear}`;
-
-        const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        const lastDayOfMonth = new Date(currentYear, currentMonth, daysInMonth).getDay();
-        const daysInLastMonth = new Date(currentYear, currentMonth, 0).getDate();
-
-        daysContainer.innerHTML = '';
-
-        for (let i = firstDayOfMonth; i > 0; i--) {
-            const dayElement = document.createElement('div');
-            dayElement.className = 'day other-month';
-            dayElement.textContent = daysInLastMonth - i + 1;
-            daysContainer.appendChild(dayElement);
-        }
-
-        const today = new Date();
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dayElement = document.createElement('div');
-            dayElement.className = 'day';
-            dayElement.textContent = day;
-
-            if (day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()) {
-                dayElement.classList.add('today');
-                dayElement.setAttribute('data-tooltip', 'Today');
-            }
-            else if (currentYear === 2025) {
-                const monthHolidays = holidays[currentMonth + 1];
-                if (monthHolidays && monthHolidays[day]) {
-                    dayElement.classList.add('holiday');
-                    dayElement.setAttribute('data-tooltip', monthHolidays[day]);
+    <script>
+        const BASE_URL = 'http://65.2.191.52:3074';
+        const ANNUAL_WFH_LIMIT = 60;
+        let validationTimeout;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('wfhForm');
+            const formContainer = document.getElementById('wfhFormContainer');
+            const requestsList = document.getElementById('requestsList');
+            const wfhSummary = document.getElementById('wfhSummary');
+            const confirmationAnimation = document.getElementById('confirmationAnimation');
+            const confirmationMessage = document.getElementById('confirmationMessage');
+            const confirmationButton = document.getElementById('confirmationButton');
+            const calendarDays = document.getElementById('calendarDays');
+            const currentMonthYear = document.getElementById('currentMonthYear');
+            const prevMonthBtn = document.getElementById('prevMonth');
+            const nextMonthBtn = document.getElementById('nextMonth');
+            const applyWFH = document.getElementById('applyWFH');
+            const detailModal = document.getElementById('detailModal');
+            const monthFilter = document.getElementById('monthFilter');
+            const yearFilter = document.getElementById('yearFilter');
+
+            let allSubmissions = [];
+            let currentDate = new Date();
+            let currentMonth = currentDate.getMonth();
+            let currentYear = currentDate.getFullYear();
+
+            init();
+
+            function init() {
+                setupEventListeners();
+                fetchSubmissions();
+                setDateConstraints();
+                const empId = sessionStorage.getItem('employeeId');
+                if (empId) {
+                    document.getElementById('employeeID').value = empId;
+                    validateEmployeeID();
                 }
             }
 
-            if (!dayElement.classList.contains('today') && !dayElement.classList.contains('holiday')) {
-                const wfhOnThisDay = allSubmissions.find(sub => {
-                    const leaveDate = new Date(sub.from_date);
-                    const leaveEndDate = new Date(sub.to_date);
-                    const currentDate = new Date(currentYear, currentMonth, day);
-                    return sub.status === 'Approved' &&
-                        currentDate >= leaveDate &&
-                        currentDate <= leaveEndDate;
+            function setDateConstraints() {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const oneYearFromToday = new Date(today);
+                oneYearFromToday.setFullYear(today.getFullYear() + 1);
+                const fromDateInput = document.getElementById('fromDate');
+                const toDateInput = document.getElementById('toDate');
+                fromDateInput.min = formatDate(today);
+                fromDateInput.max = formatDate(oneYearFromToday);
+                toDateInput.min = formatDate(today);
+                toDateInput.max = formatDate(oneYearFromToday);
+            }
+
+            function setupEventListeners() {
+                applyWFH.addEventListener('click', toggleForm);
+                form.addEventListener('submit', handleFormSubmit);
+                monthFilter.addEventListener('change', filterRequests);
+                yearFilter.addEventListener('change', filterRequests);
+
+                const inputs = [
+                    { id: 'employeeName', validator: validateEmployeeName },
+                    { id: 'employeeID', validator: validateEmployeeID },
+                    { id: 'employeeEmail', validator: validateEmail },
+                    { id: 'workingProject', validator: validateWorkingProject },
+                    { id: 'reportingManager', validator: validateReportingManager },
+                    { id: 'wfhLocation', validator: validateLocation },
+                    { id: 'reason', validator: validateReason }
+                ];
+
+                inputs.forEach(({ id, validator }) => {
+                    const input = document.getElementById(id);
+                    input.addEventListener('input', () => {
+                        clearTimeout(validationTimeout);
+                        validationTimeout = setTimeout(validator, 500);
+                    });
                 });
 
-                if (wfhOnThisDay) {
-                    dayElement.classList.add('wfh');
-                    dayElement.setAttribute('data-tooltip', 'WFH');
+                const emailInput = document.getElementById('employeeEmail');
+                emailInput.addEventListener('keydown', function(e) {
+                    if (e.key === ' ' || e.key === 'Spacebar' || /\s/.test(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+
+                emailInput.addEventListener('paste', function(e) {
+                    e.preventDefault();
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    const sanitizedText = pastedText.replace(/\s+/g, '');
+                    document.execCommand('insertText', false, sanitizedText);
+                    validateEmail();
+                });
+
+                document.getElementById('fromDate').addEventListener('change', validateDates);
+                document.getElementById('toDate').addEventListener('change', validateDates);
+
+                confirmationButton.addEventListener('click', () => {
+                    confirmationAnimation.classList.remove('show');
+                });
+
+                prevMonthBtn.addEventListener('click', () => {
+                    currentMonth--;
+                    if (currentMonth < 0) {
+                        currentMonth = 11;
+                        currentYear--;
+                    }
+                    generateCalendar();
+                });
+
+                nextMonthBtn.addEventListener('click', () => {
+                    currentMonth++;
+                    if (currentMonth > 11) {
+                        currentMonth = 0;
+                        currentYear++;
+                    }
+                    generateCalendar();
+                });
+
+                // Add event listeners for form cancel button
+                const cancelFormBtn = document.getElementById('cancelFormBtn');
+                if (cancelFormBtn) {
+                    cancelFormBtn.addEventListener('click', closeForm);
+                }
+
+                // Add event listeners for detail modal
+                const detailModalClose = document.getElementById('detailModalClose');
+                if (detailModalClose) {
+                    detailModalClose.addEventListener('click', () => detailModal.classList.remove('show'));
+                }
+
+                // Add event listeners for confirmation modal
+                const confirmModalClose = document.getElementById('confirmModalClose');
+                const cancelSubmitBtn = document.getElementById('cancelSubmitBtn');
+                const confirmSubmitBtn = document.getElementById('confirmSubmitBtn');
+
+                if (confirmModalClose) {
+                    confirmModalClose.addEventListener('click', () => closeModal('confirmModal'));
+                }
+                if (cancelSubmitBtn) {
+                    cancelSubmitBtn.addEventListener('click', cancelSubmit);
+                }
+                if (confirmSubmitBtn) {
+                    confirmSubmitBtn.addEventListener('click', confirmSubmit);
                 }
             }
 
-            daysContainer.appendChild(dayElement);
-        }
+            function toggleForm() {
+                formContainer.classList.toggle('show');
+                applyWFH.querySelector('span')?.remove();
+                const isOpen = formContainer.classList.contains('show');
+                applyWFH.innerHTML = `🏠 ${isOpen ? 'Close WFH Form' : 'Apply WFH Request'}`;
+                if (!isOpen) {
+                    form.reset();
+                    clearErrors();
+                }
+            }
 
-        for (let i = 1; i <= (6 - lastDayOfMonth); i++) {
-            const dayElement = document.createElement('div');
-            dayElement.className = 'day other-month';
-            dayElement.textContent = i;
-            daysContainer.appendChild(dayElement);
-        }
+            function closeForm() {
+                formContainer.classList.remove('show');
+                applyWFH.innerHTML = `🏠 Apply WFH Request`;
+                form.reset();
+                clearErrors();
+            }
+
+            function closeModal(modalId) {
+                document.getElementById(modalId).style.display = 'none';
+            }
+
+            function clearErrors() {
+                document.querySelectorAll('.error-message').forEach(error => {
+                    error.textContent = '';
+                    error.classList.remove('show');
+                });
+                form.querySelectorAll('input, textarea').forEach(input => {
+                    input.setCustomValidity('');
+                });
+            }
+
+            function validateEmployeeName() {
+                const name = document.getElementById('employeeName').value;
+                const nameRegex = /^[A-Za-z]+(?:\.[A-Za-z]+)*(?: [A-Za-z]+)*(?:\.[A-Za-z]+){0,3}$/;
+                const consecutiveSpaces = /\s{2,}/;
+                const leadingTrailingSpaces = /^\s+|\s+$/;
+                const errorElement = document.getElementById('employeeNameError');
+
+                if (!name) {
+                    errorElement.textContent = 'Name is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (leadingTrailingSpaces.test(name)) {
+                    errorElement.textContent = 'No leading or trailing spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (consecutiveSpaces.test(name)) {
+                    errorElement.textContent = 'No consecutive spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!nameRegex.test(name)) {
+                    errorElement.textContent = 'Invalid name: Only letters, single spaces, and up to 3 dot-separated suffixes (e.g., John.M.Doe Smith.Jr)';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateEmployeeID() {
+                const empId = document.getElementById('employeeID').value.trim();
+                const empIdRegex = /^ATS0(?!000)[0-9]{3}$/;
+                const errorElement = document.getElementById('employeeIDError');
+
+                if (!empId) {
+                    errorElement.textContent = 'Employee ID is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!empIdRegex.test(empId)) {
+                    errorElement.textContent = 'Format: ATS0 followed by 3 digits (not all zeros)';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateEmail() {
+                const emailInput = document.getElementById('employeeEmail').value;
+                const hasSpaces = /\s/;
+                const emailRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|(?![._-]{2})[._-]){2,}@(?:gmail\.com|outlook\.com|[\w-]+\.(?:co|in|org))$/;
+                const errorElement = document.getElementById('employeeEmailError');
+
+                const sanitizedEmail = emailInput.replace(/\s+/g, '');
+                if (emailInput !== sanitizedEmail) {
+                    document.getElementById('employeeEmail').value = sanitizedEmail;
+                }
+
+                if (!sanitizedEmail) {
+                    errorElement.textContent = 'Email is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (hasSpaces.test(emailInput)) {
+                    errorElement.textContent = 'No spaces allowed in email';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!emailRegex.test(sanitizedEmail)) {
+                    errorElement.textContent = 'Valid email required (e.g., user123@gmail.com, user.name@outlook.com, user-1@company.co), min 3 chars before @, no consecutive _-.';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateWorkingProject() {
+                const project = document.getElementById('workingProject').value;
+                const projectRegex = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
+                const consecutiveSpaces = /\s{2,}/;
+                const leadingTrailingSpaces = /^\s+|\s+$/;
+                const errorElement = document.getElementById('workingProjectError');
+
+                if (!project) {
+                    errorElement.textContent = 'Project name is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (leadingTrailingSpaces.test(project)) {
+                    errorElement.textContent = 'No leading or trailing spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (consecutiveSpaces.test(project)) {
+                    errorElement.textContent = 'No consecutive spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (project.length < 3 || project.length > 40) {
+                    errorElement.textContent = 'Project name must be 3-40 characters';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!projectRegex.test(project)) {
+                    errorElement.textContent = 'Project name must contain only letters and single spaces';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateReportingManager() {
+                const manager = document.getElementById('reportingManager').value;
+                const nameRegex = /^[A-Za-z]+(?:\.[A-Za-z]+)*(?: [A-Za-z]+)*(?:\.[A-Za-z]+){0,3}$/;
+                const consecutiveSpaces = /\s{2,}/;
+                const leadingTrailingSpaces = /^\s+|\s+$/;
+                const errorElement = document.getElementById('reportingManagerError');
+
+                if (!manager) {
+                    errorElement.textContent = 'Manager name is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (leadingTrailingSpaces.test(manager)) {
+                    errorElement.textContent = 'No leading or trailing spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (consecutiveSpaces.test(manager)) {
+                    errorElement.textContent = 'No consecutive spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!nameRegex.test(manager)) {
+                    errorElement.textContent = 'Invalid name: Only letters, single spaces, and up to 3 dot-separated suffixes (e.g., John.M.Doe Smith.Jr)';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateLocation() {
+                const location = document.getElementById('wfhLocation').value;
+                const locationRegex = /^[A-Za-z]+(?: [A-Za-z]+)*$/;
+                const consecutiveSpaces = /\s{2,}/;
+                const leadingTrailingSpaces = /^\s+|\s+$/;
+                const errorElement = document.getElementById('wfhLocationError');
+
+                if (!location) {
+                    errorElement.textContent = 'Location is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (leadingTrailingSpaces.test(location)) {
+                    errorElement.textContent = 'No leading or trailing spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (consecutiveSpaces.test(location)) {
+                    errorElement.textContent = 'No consecutive spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (location.length < 3 || location.length > 100) {
+                    errorElement.textContent = 'Location must be 3-100 characters';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!locationRegex.test(location)) {
+                    errorElement.textContent = 'Location must contain only letters and single spaces';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateReason() {
+                const reason = document.getElementById('reason').value;
+                const reasonRegex = /^[A-Za-z][A-Za-z0-9\s,.]*[A-Za-z0-9]$/;
+                const consecutiveSpaces = /\s{2,}/;
+                const leadingTrailingSpaces = /^\s+|\s+$/;
+                const invalidConsecutive = /(,{2,}|\.{2,}|,\s,|\.\s\.|,\s\.|\.\s,)/;
+                const errorElement = document.getElementById('reasonError');
+
+                if (!reason) {
+                    errorElement.textContent = 'Reason is required';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (leadingTrailingSpaces.test(reason)) {
+                    errorElement.textContent = 'No leading or trailing spaces';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (consecutiveSpaces.test(reason)) {
+                    errorElement.textContent = 'No consecutive spaces allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (reason.length < 10 || reason.length > 200) {
+                    errorElement.textContent = 'Reason must be 10-200 characters';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (!reasonRegex.test(reason)) {
+                    errorElement.textContent = 'Reason must start with a letter, end with a letter or number, and only letters, numbers, spaces, commas, periods';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                if (invalidConsecutive.test(reason)) {
+                    errorElement.textContent = 'No consecutive commas, periods, or invalid punctuation patterns allowed';
+                    errorElement.classList.add('show');
+                    return false;
+                }
+
+                errorElement.classList.remove('show');
+                return true;
+            }
+
+            function validateDates() {
+                const fromDateInput = document.getElementById('fromDate');
+                const toDateInput = document.getElementById('toDate');
+                const fromDate = new Date(fromDateInput.value);
+                const toDate = new Date(toDateInput.value);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const oneYearFromToday = new Date(today);
+                oneYearFromToday.setFullYear(today.getFullYear() + 1);
+                const maxRangeMs = 60 * 24 * 60 * 60 * 1000;
+                const fromError = document.getElementById('fromDateError');
+                const toError = document.getElementById('toDateError');
+
+                if (!fromDateInput.value) {
+                    fromError.textContent = 'From date is required';
+                    fromError.classList.add('show');
+                    fromDateInput.setCustomValidity('From date is required');
+                    return false;
+                }
+
+                if (fromDate < today || fromDate > oneYearFromToday) {
+                    fromError.textContent = 'From date must be today or within one year';
+                    fromError.classList.add('show');
+                    fromDateInput.setCustomValidity('Invalid date');
+                    return false;
+                }
+
+                fromError.classList.remove('show');
+                fromDateInput.setCustomValidity('');
+
+                if (!toDateInput.value) {
+                    toError.textContent = 'To date is required';
+                    toError.classList.add('show');
+                    toDateInput.setCustomValidity('To date is required');
+                    return false;
+                }
+
+                if (toDate < fromDate) {
+                    toError.textContent = 'To date must be on or after from date';
+                    toError.classList.add('show');
+                    toDateInput.setCustomValidity('Invalid date');
+                    return false;
+                }
+
+                const rangeMs = toDate - fromDate;
+                if (rangeMs > maxRangeMs) {
+                    toError.textContent = 'Date range cannot exceed 60 days';
+                    toError.classList.add('show');
+                    toDateInput.setCustomValidity('Invalid date');
+                    return false;
+                }
+
+                toError.classList.remove('show');
+                toDateInput.setCustomValidity('');
+                return true;
+            }
+
+            async function handleFormSubmit(event) {
+                event.preventDefault();
+
+                const validations = [
+                    validateEmployeeName(),
+                    validateEmployeeID(),
+                    validateEmail(),
+                    validateWorkingProject(),
+                    validateReportingManager(),
+                    validateLocation(),
+                    validateReason(),
+                    validateDates()
+                ];
+
+                if (validations.every(valid => valid)) {
+                    document.getElementById('confirmModal').style.display = 'flex';
+                } else {
+                    alert('Please correct the form errors before submitting.');
+                }
+            }
+
+            async function confirmSubmit() {
+                closeModal('confirmModal');
+                const submitBtn = document.querySelector('#wfhForm button[type="submit"]');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Submitting...';
+
+                const fromDate = new Date(document.getElementById('fromDate').value);
+                const toDate = new Date(document.getElementById('toDate').value);
+                const daysCount = Math.floor((toDate - fromDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                const request = {
+                    name: document.getElementById('employeeName').value.trim(),
+                    employeeId: document.getElementById('employeeID').value.trim(),
+                    email: document.getElementById('employeeEmail').value.trim(),
+                    project: document.getElementById('workingProject').value.trim(),
+                    manager: document.getElementById('reportingManager').value.trim(),
+                    location: document.getElementById('wfhLocation').value.trim(),
+                    fromDate: document.getElementById('fromDate').value,
+                    toDate: document.getElementById('toDate').value,
+                    reason: document.getElementById('reason').value.trim(),
+                    status: 'Pending'
+                };
+
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+                    const response = await fetch(`${BASE_URL}/api/requests`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                        body: JSON.stringify(request),
+                        signal: controller.signal,
+                        mode: 'cors'
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    let result;
+                    try {
+                        result = await response.json();
+                    } catch (jsonError) {
+                        console.error('Error parsing JSON response:', jsonError, 'Status:', response.status);
+                        alert(`Server returned invalid response: ${response.status} ${response.statusText}`);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '✈️ Submit Request';
+                        return;
+                    }
+
+                    if (!response.ok) {
+                        console.error('Server error response:', result, 'Status:', response.status);
+                        alert(`Server error: ${result.error || 'Failed to submit request'}`);
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '✈️ Submit Request';
+                        return;
+                    }
+
+                    sessionStorage.setItem('employeeId', request.employeeId);
+                    form.reset();
+                    closeForm();
+                    showConfirmation(request.fromDate, request.toDate, daysCount);
+                    await fetchSubmissions();
+
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✈️ Submit Request';
+
+                    setTimeout(() => {
+                        if (confirmationAnimation.classList.contains('show')) {
+                            confirmationAnimation.classList.remove('show');
+                        }
+                    }, 5000);
+
+                } catch (error) {
+                    console.error('Error submitting request:', error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '✈️ Submit Request';
+                    if (error.name === 'AbortError') {
+                        alert('Error submitting request: Request timed out. Please try again.');
+                    } else if (error.message.includes('Failed to fetch')) {
+                        alert('Error submitting request: Unable to connect to server. Check network or server status.');
+                    } else {
+                        alert('Error submitting request: ' + error.message);
+                    }
+                }
+            }
+
+            function cancelSubmit() {
+                closeModal('confirmModal');
+            }
+
+            function showConfirmation(fromDate, toDate, daysCount) {
+                const from = formatDate(fromDate);
+                const to = formatDate(toDate);
+                confirmationMessage.textContent = `Your work from home request for ${daysCount} day${daysCount > 1 ? 's' : ''} (${from} to ${to}) has been successfully submitted for approval.`;
+                confirmationAnimation.classList.add('show');
+                confirmationAnimation.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            async function fetchSubmissions() {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 30000);
+                    const response = await fetch(`${BASE_URL}/api/requests`, {
+                        headers: { 'Accept': 'application/json' },
+                        signal: controller.signal,
+                        mode: 'cors'
+                    });
+                    clearTimeout(timeoutId);
+
+                    let submissions;
+                    try {
+                        submissions = await response.json();
+                    } catch (jsonError) {
+                        console.error('Error parsing JSON response:', jsonError, 'Status:', response.status);
+                        throw new Error(`Invalid server response: ${response.status} ${response.statusText}`);
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`${submissions.error || 'Server error'}`);
+                    }
+
+                    allSubmissions = submissions;
+                    filterRequests();
+                    displaySummary();
+                    generateCalendar();
+                } catch (error) {
+                    console.error('Error fetching submissions:', error);
+                    requestsList.innerHTML = `
+                        <div class="no-data">
+                            <span>⚠️</span>
+                            <p>Error loading requests</p>
+                        </div>
+                    `;
+                    wfhSummary.innerHTML = `
+                        <div class="no-data">
+                            <span>⚠️</span>
+                            <p>Error loading summary</p>
+                        </div>
+                    `;
+                }
+            }
+
+            function filterRequests() {
+                const month = monthFilter.value;
+                const year = yearFilter.value;
+
+                const filteredSubmissions = allSubmissions.filter(sub => {
+                    const fromDate = new Date(sub.from_date);
+                    const matchesMonth = month === '' || fromDate.getMonth() === parseInt(month);
+                    const matchesYear = year === '' || fromDate.getFullYear() === parseInt(year);
+                    return matchesMonth && matchesYear;
+                });
+
+                displayRequests(filteredSubmissions);
+            }
+
+            function displayRequests(submissions) {
+                requestsList.innerHTML = '';
+                if (submissions.length === 0) {
+                    requestsList.innerHTML = `
+                    <div class="no-data">
+                    <span>📭</span>
+                    <p>No requests found</p>
+                    </div>`;
+                    return;
+                }
+
+                submissions.forEach(sub => {
+                    const item = document.createElement('div');
+                    item.className = 'request-item';
+                    const fromDate = formatDate(sub.from_date);
+                    const toDate = formatDate(sub.to_date);
+                    item.innerHTML = `
+                    <div class="request-header">
+                    <div class="request-type">🏠 Work From Home</div>
+                    <span class="request-status status-${sub.status.toLowerCase()}">${sub.status}</span>
+                    </div>
+                    <span class="request-dates">${fromDate} - ${toDate}</span>
+                    <a href="#" class="view-link" >View Details</a>
+                    `;
+                    item.querySelector('.view-link').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        showRequestDetails(sub);
+                    });
+                    requestsList.appendChild(item);
+                });
+            }
+
+            function showRequestDetails(submission) {
+                const detailsContainer = document.getElementById('requestDetails');
+                const fromDate = formatDate(submission.from_date);
+                const toDate = formatDate(submission.to_date);
+                detailsContainer.innerHTML = `
+                <h2>Request Details</h2>
+                <p><span class="emoji">👤</span> <strong>Name:</strong> ${submission.name}</p>
+                <p><span class="emoji">🪪</span> <strong>Employee ID:</strong> ${submission.employee_id}</p>
+                <p><span class="emoji">📧</span> <strong>Email:</strong> ${submission.email}</p>
+                <p><span class="emoji">💡</span> <strong>Project:</strong> ${submission.project}</p>
+                <p><span class="emoji">👨‍💼</span> <strong>Manager:</strong> ${submission.manager}</p>
+                <p><span class="emoji">📍</span> <strong>Location:</strong> ${submission.location}</p>
+                <p><span class="emoji">📅</span> <strong>Dates:</strong> ${fromDate} - ${toDate}</p>
+                <p><span class="emoji">💬</span> <strong>Reason:</strong> ${submission.reason}</p>
+                <p><span class="emoji">🔍</span> <strong>Status:</strong> <span class="request-status status-${submission.status.toLowerCase()}">${submission.status}</span></p>
+                `;
+                detailModal.classList.add('show');
+            }
+
+            function displaySummary() {
+                const approvedDays = calculateApprovedDays();
+                const remainingDays = ANNUAL_WFH_LIMIT - approvedDays;
+                wfhSummary.innerHTML = `
+                <div class="summary-item">
+                    <span class="emoji">✅</span>
+                    <span>${approvedDays}/${ANNUAL_WFH_LIMIT} Approved WFH Days</span>
+                </div>
+                <div class="summary-item">
+                    <span class="emoji">⏳</span>
+                    <span class="">${remainingDays} Remaining WFH Days</span>
+                </div>
+                `;
+            }
+
+            function calculateApprovedDays() {
+                let totalDays = 0;
+                const approvedRequests = allSubmissions.filter(sub => sub.status === 'Approved');
+                approvedRequests.forEach(sub => {
+                    const start = new Date(sub.from_date);
+                    const end = new Date(sub.to_date);
+                    const days = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                    totalDays += days;
+                });
+                return totalDays;
+            }
+
+            function generateCalendar() {
+    const daysContainer = document.getElementById('calendarDays');
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+        'August', 'September', 'October', 'November', 'December'];
+    currentMonthYear.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const lastDayOfMonth = new Date(currentYear, currentMonth, daysInMonth).getDay();
+    const daysInLastMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+    daysContainer.innerHTML = '';
+
+    // Add days from the previous month
+    for (let i = firstDayOfMonth; i > 0; i--) {
+        const dayElement = document.createElement('div');
+        dayElement.className = 'day other-month';
+        dayElement.textContent = daysInLastMonth - i + 1;
+        daysContainer.appendChild(dayElement);
     }
 
-    function formatDate(dateString) {
-        const options = { year: 'numeric', month: 'short', day: 'numeric' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayElement = document.createElement('div');
+        dayElement.className = 'day';
+        dayElement.textContent = day;
+
+        // Check if the day is today
+        if (day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()) {
+            dayElement.classList.add('today');
+            dayElement.setAttribute('data-tooltip', 'Today');
+        }
+        // Check if the day is a holiday (only if not today)
+        else if (currentYear === 2025) {
+            const monthHolidays = holidays[currentMonth + 1];
+            if (monthHolidays && monthHolidays[day]) {
+                dayElement.classList.add('holiday');
+                dayElement.setAttribute('data-tooltip', monthHolidays[day]);
+            }
+        }
+
+        // Check if the day has an approved WFH request (only if not today or holiday)
+        if (!dayElement.classList.contains('today') && !dayElement.classList.contains('holiday')) {
+            const wfhOnThisDay = allSubmissions.find(sub => {
+                const leaveDate = new Date(sub.from_date);
+                const leaveEndDate = new Date(sub.to_date);
+                const currentDate = new Date(currentYear, currentMonth, day);
+                return sub.status === 'Approved' &&
+                    currentDate >= leaveDate &&
+                    currentDate <= leaveEndDate;
+            });
+
+            if (wfhOnThisDay) {
+                dayElement.classList.add('wfh');
+                dayElement.setAttribute('data-tooltip', 'WFH');
+            }
+        }
+
+        daysContainer.appendChild(dayElement);
     }
-});
-</script>
+
+    // Add days from the next month
+    for (let i = 1; i <= (6 - lastDayOfMonth); i++) {
+        const dayElement = document.createElement('div');
+        dayElement.className = 'day other-month';
+        dayElement.textContent = i;
+        daysContainer.appendChild(dayElement);
+    }
+}
+
+            const holidays = {
+                1: { 1: "New Year's Day", 14: "Makar Sankranti", 26: "Republic Day" },
+                2: { 14: "Maha Shivaratri" },
+                3: { 2: "Holi" },
+                4: { 14: "Ram Navami", 18: "Good Friday" },
+                8: { 15: "Independence Day", 5: "Krishna Janmashtami", 15: "Ganesh Chaturthi" },
+                10: { 2: "Gandhi Jayanti", 20: "Dussehra", 9: "Diwali" },
+                12: { 25: "Christmas" }
+            };
+
+            function formatDate(dateString) {
+                const options = { year: 'numeric', month: 'short', day: 'numeric' };
+                return new Date(dateString).toLocaleDateString(undefined, options);
+            }
+        });
+    </script>
 </body>
 </html>
